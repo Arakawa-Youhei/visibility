@@ -12,9 +12,13 @@
 pip install pywavefront
 ```
 - ``pyembree``のインストール
-  - python 3.7+
+  - python 3.6 ~ 3.9で対応？
   - pyembree == 0.1.12
 ```
 pip install pyembree
 ```
-
+上記のpythonのバージョン以外は
+`embreex`パッケージを使用
+```
+pip install embreex
+```
