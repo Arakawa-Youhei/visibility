@@ -10,8 +10,8 @@
 pip install pywavefront
 ```
 
-- ``pyembree``のインストールpywavefront == 1.3.3
-      -
+- ``pyembree``のインストール
+      -pywavefront == 1.3.3
      - python 3.7+
 ```
 pip install pyembree
