@@ -5,12 +5,11 @@
     - embreeのpython wrapperでレイトレーシングができるらしい
     - 各頂点から，レイを飛ばし可視関数の値を求める
 
-- ``pywavefront``のインストール
+- ``pywavefront``のインストール( pywavefront == 1.3.3 )
   
 ```
 pip install pywavefront
 ```
-- pywavefront == 1.3.3
 - ``pyembree``のインストール
   - python 3.7+
   - pyembree == 0.1.12
