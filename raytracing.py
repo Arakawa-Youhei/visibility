@@ -21,8 +21,8 @@ def generate_sphere_directions(grid_size):
     """
     球面上の一様な方向ベクトルを生成
     """
-    phi = np.linspace(0, np.pi, grid_size)  # 緯度
-    theta = np.linspace(0, 2 * np.pi, grid_size)  # 経度
+    phi = np.linspace(0, np.pi, grid_size)  # theta
+    theta = np.linspace(0, 2 * np.pi, grid_size)  # phi
     phi, theta = np.meshgrid(phi, theta)
     x = np.sin(phi) * np.cos(theta)
     y = np.sin(phi) * np.sin(theta)
