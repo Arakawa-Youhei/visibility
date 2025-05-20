@@ -22,3 +22,8 @@ pip install pyembree
 ```
 pip install embreex
 ```
+
+```
+pip install cupy
+```
+
