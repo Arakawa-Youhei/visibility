@@ -26,4 +26,4 @@ pip install embreex
 ```
 pip install cupy
 ```
-
+HyperDreamerの ``sg_render.py``を基に改良を行っていく
