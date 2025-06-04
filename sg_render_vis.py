@@ -79,3 +79,70 @@ def render_with_sg_visibility(lgtSGs, diffuse_visSGs, specular_visSGs,
         diff = lambda2 * (tmp - ratio - 1.)
         final_lobes = lambda1_over_lambda3 * lobe1 + lambda2_over_lambda3 * lobe2
         final_lambdas = lambda3
+        final_mus = mu1 * mu2 * torch.exp(diff)
+        return final_lobes, final_lambdas, final_mus
+
+    # 半球積分の近似
+    def hemisphere_int(lambda_val, cos_beta):
+        lambda_val = lambda_val + TINY_NUMBER
+        inv_lambda = 1. / lambda_val
+        t = torch.sqrt(lambda_val) * (1.6988 + 10.8438 * inv_lambda) / (1. + 6.2201 * inv_lambda + 10.2415 * inv_lambda ** 2)
+        inv_a = torch.exp(-t)
+        mask = (cos_beta >= 0).float()
+        inv_b = torch.exp(-t * torch.clamp(cos_beta, min=0.))
+        s1 = (1. - inv_a * inv_b) / (1. - inv_a + inv_b - inv_a * inv_b)
+        b = torch.exp(t * torch.clamp(cos_beta, max=0.))
+        s2 = (b - inv_a) / ((1. - inv_a) * (b + 1.))
+        s = mask * s1 + (1. - mask) * s2
+        A_b = 2. * np.pi / lambda_val * (torch.exp(-lambda_val) - torch.exp(-2. * lambda_val))
+        A_u = 2. * np.pi / lambda_val * (1. - torch.exp(-lambda_val))
+        return A_b * (1. - s) + A_u * s
+
+    # SGをBRDFと統合し積分評価
+def integrate_sg(lgtSGs, diffuse_albedo, normal, viewdirs, roughness, is_specular):
+        dots_shape = list(normal.shape[:-1])
+        M = lgtSGs.shape[0]
+        normal = normal.unsqueeze(-2).expand(dots_shape + [M, 3])
+        viewdirs = viewdirs.unsqueeze(-2).expand(dots_shape + [M, 3])
+        lgtSGs = lgtSGs.view([1] * len(dots_shape) + [M, 7]).expand(dots_shape + [M, 7])
+        lgtSGLobes = lgtSGs[..., :3] / (torch.norm(lgtSGs[..., :3], dim=-1, keepdim=True) + TINY_NUMBER)
+        lgtSGLambdas = torch.abs(lgtSGs[..., 3:4])
+        lgtSGMus = torch.abs(lgtSGs[..., -3:])
+
+        if is_specular:
+            inv_rough4 = 1. / (roughness ** 4 + TINY_NUMBER)
+            brdf_lambdas = (2. * inv_rough4).unsqueeze(-2).expand(dots_shape + [M, 1])
+            brdf_mus = (inv_rough4 / np.pi).expand(dots_shape + [3]).unsqueeze(-2).expand(dots_shape + [M, 3])
+            v_dot_lobe = torch.sum(normal * viewdirs, dim=-1, keepdim=True).clamp(min=0.)
+            warp_lobes = 2 * v_dot_lobe * normal - viewdirs
+            warp_lobes = warp_lobes / (torch.norm(warp_lobes, dim=-1, keepdim=True) + TINY_NUMBER)
+            warp_lambdas = brdf_lambdas / (4 * v_dot_lobe + TINY_NUMBER)
+            warp_mus = brdf_mus
+            lobes, lambdas, mus = lambda_trick(lgtSGLobes, lgtSGLambdas, lgtSGMus, warp_lobes, warp_lambdas, warp_mus)
+        else:
+            diffuse = (diffuse_albedo / np.pi).unsqueeze(-2).expand(dots_shape + [M, 3])
+            lobes = lgtSGLobes
+            lambdas = lgtSGLambdas
+            mus = lgtSGMus * diffuse
+
+        mu_cos, lambda_cos, alpha_cos = 32.7080, 0.0315, 31.7003
+        lobe_prime, lambda_prime, mu_prime = lambda_trick(normal, lambda_cos, mu_cos, lobes, lambdas, mus)
+        dot1 = torch.sum(lobe_prime * normal, dim=-1, keepdim=True)
+        dot2 = torch.sum(lobes * normal, dim=-1, keepdim=True)
+        out = mu_prime * hemisphere_int(lambda_prime, dot1) - mus * alpha_cos * hemisphere_int(lambdas, dot2)
+        return out.sum(dim=-2)
+
+    # 可視性を合成（なければそのまま）
+    lgtSGs_diffuse = apply_visibility_sg(lgtSGs, diffuse_visSGs) if diffuse_visSGs is not None else lgtSGs
+    lgtSGs_specular = apply_visibility_sg(lgtSGs, specular_visSGs) if specular_visSGs is not None else lgtSGs
+
+    # 拡散と鏡面成分のレンダリング結果
+    Ld = integrate_sg(lgtSGs_diffuse, diffuse_albedo, normal, viewdirs, roughness, is_specular=False)
+    Ls = integrate_sg(lgtSGs_specular, diffuse_albedo, normal, viewdirs, roughness, is_specular=True)
+    rgb = Ld + Ls
+
+    return {
+        'rgb': rgb,
+        'Ld': Ld,
+        'Ls': Ls,
+    }
