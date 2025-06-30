@@ -4,6 +4,8 @@ import cupy as cp
 from PIL import Image
 import os
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+
 
 # ======== メッシュ読み込み ========
 mesh_path = "mesh/model.obj"
@@ -63,10 +65,28 @@ output_dir = "vertex_raytracing_images"
 os.makedirs(output_dir, exist_ok=True)
 
 for i, result in enumerate(tqdm(results, desc="Saving images")):
+    # 結果を2次元グリッドに変換
     image = np.zeros((grid_size, grid_size), dtype=np.uint8)
     for k, value in enumerate(result):
         x = k % grid_size
         y = k // grid_size
-        image[y, x] = 255 if not value else 0  # 白=可視, 黒=遮蔽
-    Image.fromarray(image, mode='L').save(f"{output_dir}/vertex_{i:05d}.png")
+        image[y, x] = 0 if value else 255  # 0=Hit, 255=No hit
+
+    # 描画と凡例付き保存
+    fig, ax = plt.subplots()
+    im = ax.imshow(image, cmap='gray', origin='lower', extent=[0, 360, 0, 90])
+    
+    ax.set_title(f"Vertex {i}")
+    ax.set_xlabel("Azimuth φ (deg)")
+    ax.set_ylabel("Polar θ (deg)")
+
+    # カラーバーに凡例を追加
+    cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cbar.set_label("No Hit (white) / Hit (black)")
+    cbar.set_ticks([0, 255])
+    cbar.set_ticklabels(["Hit (black)", "No Hit (white)"])
+
+    # 保存
+    plt.savefig(f"{output_dir}/vertex_{i:05d}.png")
+    plt.close(fig)
 print(f"Saved raytrace images to: {output_dir}")
