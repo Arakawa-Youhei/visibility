@@ -33,4 +33,11 @@ ax.set_xlabel("X")
 ax.set_ylabel("Y (up)")
 ax.set_zlabel("Z")
 plt.tight_layout()
-plt.show()
+
+# 保存用ディレクトリとファイル
+output_dir = "visibility/sg_axis_visualization"
+os.makedirs(output_dir, exist_ok=True)
+output_path = f"{output_dir}/sg_axes_vertex0.png"
+plt.savefig(output_path)
+print(f"Saved SG axis visualization to: {output_path}")
+plt.close()
