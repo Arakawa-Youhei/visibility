@@ -35,6 +35,18 @@ def hemisphere_int(lambda_val, cos_beta):
     A_b = 2. * np.pi / lambda_val * (torch.exp(-lambda_val) - torch.exp(-2. * lambda_val))
     A_u = 2. * np.pi / lambda_val * (1. - torch.exp(-lambda_val))
     return A_b * (1. - s) + A_u * s
+    
+def render_with_preloaded_sg(lgtSGs, specular_reflectance, roughness, diffuse_albedo,
+                             normal, viewdirs, diffuse_rgb=None):
+    """
+    visSGs_all.pt を自動読み込みして、render_with_sg に渡すラッパー関数
+    """
+    visSGs_all = torch.load("visibility/visSGs_all.pt")  # [V, J, 7]
+    return render_with_sg(
+        lgtSGs, specular_reflectance, roughness, diffuse_albedo,
+        normal, viewdirs, visSGs=visSGs_all, diffuse_rgb=diffuse_rgb
+    )
+
 
 def render_with_sg(lgtSGs, specular_reflectance, roughness, diffuse_albedo,
                    normal, viewdirs, visSGs=None, diffuse_rgb=None):
