@@ -1,3 +1,5 @@
+#raytracingから得られた各頂点の法線方向情報を取得し、ローカル座標系においての球面ガウス関数で近似したものを可視化する
+#各頂点の法線方向をY軸とした半球
 
 import torch
 import numpy as np
