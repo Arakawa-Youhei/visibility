@@ -46,7 +46,7 @@ def get_rotation_to_world(normal):
     return R.from_rotvec(axis * angle).as_matrix()
 
 # ====== 各頂点ごとのレイ方向（ワールド空間で） ======
-offset = 0.01
+offset = 0.05
 all_results = np.zeros((V, D), dtype=np.uint8)
 
 for i in tqdm(range(V), desc="Raytracing"):
@@ -72,15 +72,15 @@ output_dir = "vertex_raytracing_images_202507101800"
 os.makedirs(output_dir, exist_ok=True)
 
 for i in tqdm(range(V), desc="Saving images"):
-    image = all_results[i].reshape(grid_size, grid_size)
+    image = (all_results[i].reshape(grid_size, grid_size) * 255).astype(np.uint8)
     fig, ax = plt.subplots()
     im = ax.imshow(image, cmap='gray', origin='lower', extent=[0, 360, 0, 90])
     ax.set_title(f"Vertex {i}")
-    ax.set_xlabel("Azimuth φ (deg)")    # 方位角 φ
-    ax.set_ylabel("Elevation θ (deg)")  # 天頂角 θ
+    ax.set_xlabel("Azimuth φ (deg)")
+    ax.set_ylabel("Elevation θ (deg)")
     cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
     cbar.set_label("Visibility")
-    cbar.set_ticks([0, 1])
+    cbar.set_ticks([0, 255])
     cbar.set_ticklabels(["Occluded", "Visible"])
     plt.savefig(f"{output_dir}/vertex_{i:05d}.png")
     plt.close()
