@@ -90,3 +90,9 @@ for i, result in enumerate(tqdm(results, desc="Saving images")):
     plt.savefig(f"{output_dir}/vertex_{i:05d}.png")
     plt.close(fig)
 print(f"Saved raytrace images to: {output_dir}")
+
+# ======== 法線の保存 ========
+normals = np.array(mesh.vertex_normals)
+np.save("visibility/normals.npy", normals)
+print("Saved: normals.npy")
+
