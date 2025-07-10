@@ -70,6 +70,6 @@ def main(obj_path, output_dir):
 
 # 実行例
 if __name__ == "__main__":
-    obj_path = "your_model.obj"  # ←ファイル名を適宜変更
-    output_dir = "output_local_raytrace"
+    obj_path = "exp/strawberry_s2/mesh/mesh.obj"  # ←ファイル名を適宜変更
+    output_dir = "output_local_raytrace_20250711"
     main(obj_path, output_dir)
