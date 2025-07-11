@@ -57,7 +57,7 @@ def visualize_visibility(vertex_id=0, mu_path="visibility/trained_mu_localSG.pt"
             
     out_path = os.path.join(output_dir, f"visibility_map_vertex{vertex_id}.png")
     plt.figure(figsize=(6, 5))
-    im = plt.imshow(V.cpu().numpy(), origin="lower", extent=[0, 360, 0, 90], cmap='viridis')
+    im = plt.imshow(V_map.cpu().numpy(), origin="lower", extent=[0, 360, 0, 90], cmap='viridis')
     plt.xlabel("phi (°)")
     plt.ylabel("theta (°)")
     plt.title(f"近似可視関数（頂点 {vertex_id}）")
