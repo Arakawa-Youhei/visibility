@@ -48,7 +48,7 @@ num_steps = 1000
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # npyの読み込み
-npy_dir = "visibility/npy_data"
+npy_dir = "raytracing_results/202507111807/npy"
 npy_files = sorted([f for f in os.listdir(npy_dir) if f.endswith(".npy") and f.startswith("vertex_")])
 V_targets_np = [np.load(os.path.join(npy_dir, f)) for f in npy_files]
 V_targets = torch.from_numpy(np.stack(V_targets_np)).float().to(device)  # [V, D]
