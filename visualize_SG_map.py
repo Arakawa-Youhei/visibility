@@ -54,18 +54,18 @@ def visualize_visibility(vertex_id=0, mu_path="visibility/trained_mu_localSG.pt"
             dot = torch.sum(dirs * a, dim=-1, keepdim=True)
             G = mu[j].mean() * torch.exp(lam * (dot - 1.0))
             V_map += G.squeeze(-1)
-            
-    out_path = os.path.join(output_dir, f"visibility_map_vertex{vertex_id}.png")
-    plt.figure(figsize=(6, 5))
-    im = plt.imshow(V_map.cpu().numpy(), origin="lower", extent=[0, 360, 0, 90], cmap='viridis')
-    plt.xlabel("phi (°)")
-    plt.ylabel("theta (°)")
-    plt.title(f"近似可視関数（頂点 {vertex_id}）")
-    plt.colorbar(im, label="Visibility")
-    plt.tight_layout()
-    plt.savefig(out_path)
-    plt.close()
-    print(f"保存しました: {out_path}")
+        out_path = os.path.join(output_dir, f"visibility_map_vertex{vertex_id}.png")
+        plt.figure(figsize=(6, 5))
+        im = plt.imshow(V_map.cpu().numpy(), origin="lower", extent=[0, 360, 0, 90], cmap='viridis')
+        plt.xlabel("phi (°)")
+        plt.ylabel("theta (°)")
+        plt.title(f"近似可視関数（頂点 {vertex_id}）")
+        plt.colorbar(im, label="Visibility")
+        plt.tight_layout()
+        plt.savefig(out_path)
+        plt.close()
+        print(f"保存しました: {out_path}")
+    
 
 # 実行例
 if __name__ == "__main__":
