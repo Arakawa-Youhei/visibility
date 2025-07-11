@@ -27,32 +27,34 @@ def initialize_visSGs(J=5, theta_deg=45.0):
 
 # ====== 可視化関数 ======
 def visualize_visibility(vertex_id=0, mu_path="visibility/trained_mu_localSG.pt", theta_deg=45.0, res=100, output_dir="visibility/visibility_maps"):
-    mu_all = torch.load(mu_path)  # [V, J, 3]
-    mu = mu_all[vertex_id]        # [J, 3]
+   mu_all = torch.load(mu_path)  # [V, J, 3]
+    V = mu_all.shape[0]
 
-    axes, lambdas = initialize_visSGs(J=mu.shape[0], theta_deg=theta_deg)
-    
+    axes, lambdas = initialize_visSGs(J=mu_all.shape[1], theta_deg=theta_deg)
+
     theta = torch.linspace(0, np.pi / 2, res)
     phi = torch.linspace(0, 2 * np.pi, res)
     theta_grid, phi_grid = torch.meshgrid(theta, phi, indexing='ij')
 
-    # 球面方向ベクトル [res, res, 3]
     x = torch.sin(theta_grid) * torch.cos(phi_grid)
     y = torch.sin(theta_grid) * torch.sin(phi_grid)
     z = torch.cos(theta_grid)
     dirs = torch.stack([x, y, z], dim=-1)  # [res, res, 3]
 
-    # 可視関数の評価
-    V = torch.zeros_like(theta_grid)
-    for j in range(mu.shape[0]):
-        a = axes[j]
-        lam = lambdas[j]
-        dot = torch.sum(dirs * a, dim=-1, keepdim=True)  # [res, res, 1]
-        G = mu[j].mean() * torch.exp(lam * (dot - 1.0))  # RGB平均で評価
-        V += G.squeeze(-1)
-
     # 可視化
     os.makedirs(output_dir, exist_ok=True)
+
+    for vertex_id in range(V):
+        mu = mu_all[vertex_id]  # [J, 3]
+        V_map = torch.zeros_like(theta_grid)
+
+        for j in range(mu.shape[0]):
+            a = axes[j]
+            lam = lambdas[j]
+            dot = torch.sum(dirs * a, dim=-1, keepdim=True)
+            G = mu[j].mean() * torch.exp(lam * (dot - 1.0))
+            V_map += G.squeeze(-1)
+            
     out_path = os.path.join(output_dir, f"visibility_map_vertex{vertex_id}.png")
     plt.figure(figsize=(6, 5))
     im = plt.imshow(V.cpu().numpy(), origin="lower", extent=[0, 360, 0, 90], cmap='viridis')
