@@ -52,6 +52,8 @@ def visualize_visibility(vertex_id=0, mu_path="visibility/trained_mu_localSG.pt"
         V += G.squeeze(-1)
 
     # 可視化
+    os.makedirs(output_dir, exist_ok=True)
+    out_path = os.path.join(output_dir, f"visibility_map_vertex{vertex_id}.png")
     plt.figure(figsize=(6, 5))
     im = plt.imshow(V.cpu().numpy(), origin="lower", extent=[0, 360, 0, 90], cmap='viridis')
     plt.xlabel("phi (°)")
@@ -59,9 +61,10 @@ def visualize_visibility(vertex_id=0, mu_path="visibility/trained_mu_localSG.pt"
     plt.title(f"近似可視関数（頂点 {vertex_id}）")
     plt.colorbar(im, label="Visibility")
     plt.tight_layout()
-    plt.savefig(f"visibility_map_vertex{vertex_id}.png")
-    plt.show()
+    plt.savefig(out_path)
+    plt.close()
+    print(f"保存しました: {out_path}")
 
 # 実行例
 if __name__ == "__main__":
-    visualize_visibility(vertex_id=0)
+    visualize_visibility(vertex_id=0, output_dir="visibility/visibility_maps")
