@@ -12,8 +12,14 @@ num_steps = 1000
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # 遮蔽マップと方向を読み込む
-V_targets = torch.from_numpy(np.load("visibility/visibility_dataset.npy")).float().to(device)  # [V, D]
-dirs = torch.from_numpy(np.load("visibility/directions.npy")).float().to(device)               # [D, 3]
+# ↓ 変更開始：頂点ごとの .npy を読み込むように変更
+import os
+npy_dir = "raytracing_results/202507111807/npy"  # 出力先に合わせて変更
+npy_files = sorted([f for f in os.listdir(npy_dir) if f.endswith('.npy') and f.startswith('vertex_')])
+all_data = [np.load(os.path.join(npy_dir, f)) for f in npy_files]
+V_targets = torch.from_numpy(np.stack(all_data)).float().to(device)  # [V, D]
+# ↑ 変更終了
+dirs = torch.from_numpy(np.load(os.path.join(npy_dir, 'directions.npy'))).float().to(device)
 
 V, D = V_targets.shape
 mu_all = torch.nn.Parameter(torch.ones(V, J, 3, device=device))  # 学習対象
