@@ -36,7 +36,7 @@ def compute_vmap(mu, axes, lambdas, dirs):
         V_map += G.squeeze(-1)
     return V_map
 
-def visualize_all_vertices(mu_path="visibility/trained_mu_localSG.pt", theta_deg=45.0, res=100, output_dir="results/visibility_maps_fixedscale"):
+def visualize_all_vertices(mu_path="visibility/trained_mu_localSG.pt", theta_deg=45.0, res=100, output_dir="results/visibility_maps"):
     mu_all = torch.load(mu_path)  # [V, J, 3]
     V = mu_all.shape[0]
 
