@@ -1,4 +1,3 @@
-
 import os
 import numpy as np
 import torch
@@ -42,64 +41,62 @@ def world_to_local(dirs, normals):
 
 def visibility_loss(V_target, mus, dirs_local, axes, lambdas):
     V, D, _ = dirs_local.shape
-    dirs_exp = dirs_local.unsqueeze(2)
-    axes_exp = axes.unsqueeze(0).unsqueeze(0)
-    lambdas_exp = lambdas.unsqueeze(0).unsqueeze(0)
-    mus_exp = mus.unsqueeze(1)
-    dot = torch.sum(dirs_exp * axes_exp, dim=-1, keepdim=True)
-    G = mus_exp * torch.exp(lambdas_exp * (dot - 1.))
-    G_sum = G.sum(dim=2).mean(dim=-1)
-    loss = torch.nn.functional.mse_loss(G_sum, V_target)
+    dirs_exp = dirs_local.unsqueeze(2)     # [V, D, 1, 3]
+    axes_exp = axes.unsqueeze(0).unsqueeze(0)     # [1, 1, J, 3]
+    lambdas_exp = lambdas.unsqueeze(0).unsqueeze(0)   # [1, 1, J, 1]
+    mus_exp = mus.unsqueeze(1)     # [V, 1, J, 3]
+    dot = torch.sum(dirs_exp * axes_exp, dim=-1, keepdim=True)  # [V, D, J, 1]
+    G = mus_exp * torch.exp(lambdas_exp * (dot - 1.))  # [V, D, J, 3]
+    G_sum = G.sum(dim=2).mean(dim=-1)  # [V, D, 3] → mean over RGB
+    loss = torch.nn.functional.mse_loss(G_sum.mean(dim=-1), V_target.squeeze(1))
     return loss
 
 # ========== メイン処理 ==========
+
 J = 5
 theta_deg = 60.0
 learning_rate = 5e-3
 num_steps = 2000
-batch_size = 64
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
+# データ読み込み
 npy_dir = "raytracing_results/202507111807/npy"
 npy_files = sorted([f for f in os.listdir(npy_dir) if f.endswith(".npy") and f.startswith("vertex_")])
 V_targets_np = [np.load(os.path.join(npy_dir, f)) for f in npy_files]
-V_targets = torch.from_numpy(np.stack(V_targets_np)).float()
-dirs_all = torch.from_numpy(np.load(os.path.join(npy_dir, "directions.npy"))).float()
-normals_all = torch.from_numpy(np.load(os.path.join(npy_dir, "normals.npy"))).float()
+V_targets = torch.from_numpy(np.stack(V_targets_np)).float()  # [V, D]
+dirs_all = torch.from_numpy(np.load(os.path.join(npy_dir, "directions.npy"))).float()  # [D, 3]
+normals_all = torch.from_numpy(np.load(os.path.join(npy_dir, "normals.npy"))).float()  # [V, 3]
 
 V, D = V_targets.shape
-dirs_all = dirs_all.unsqueeze(0).expand(V, -1, -1)
+dirs_all = dirs_all.unsqueeze(0).expand(V, -1, -1)  # [V, D, 3]
 
+# SG方向とλは固定
 base_visSGs = initialize_visSGs(J=J, theta_deg=theta_deg)
-axes_local = base_visSGs[:, :3].to(device)
-lambdas = base_visSGs[:, 3:4].to(device)
+axes_local = base_visSGs[:, :3].to(device)      # [J, 3]
+lambdas = base_visSGs[:, 3:4].to(device)        # [J, 1]
 
-mu_all = torch.nn.Parameter(torch.ones(V, J, 3, device=device))
-optimizer = torch.optim.Adam([mu_all], lr=learning_rate)
+# μを頂点ごとに個別学習
+mu_all = torch.zeros(V, J, 3, device=device)
 
-for step in tqdm(range(num_steps)):
-    total_loss = 0.0
-    for i in range(0, V, batch_size):
-        V_batch = slice(i, min(i + batch_size, V))
-        dirs_batch = dirs_all[V_batch].to(device)
-        normals_batch = normals_all[V_batch].to(device)
-        dirs_local_batch = world_to_local(dirs_batch, normals_batch)
+print("頂点ごとのμ学習を開始...")
+for v in tqdm(range(V)):
+    dirs_v = dirs_all[v:v+1].to(device)            # [1, D, 3]
+    normal_v = normals_all[v:v+1].to(device)       # [1, 3]
+    dirs_local = world_to_local(dirs_v, normal_v)  # [1, D, 3]
+    V_target_v = V_targets[v:v+1].to(device)       # [1, D]
 
-        V_targets_batch = V_targets[V_batch].to(device)
-        mu_batch = mu_all[V_batch]
+    mu = torch.nn.Parameter(torch.ones(J, 3, device=device))  # [J, 3]
+    optimizer = torch.optim.Adam([mu], lr=learning_rate)
 
-        loss = visibility_loss(V_targets_batch, mu_batch, dirs_local_batch, axes_local, lambdas)
-
+    for step in range(num_steps):
         optimizer.zero_grad()
+        loss = visibility_loss(V_target_v, mu.unsqueeze(0), dirs_local, axes_local, lambdas)
         loss.backward()
         optimizer.step()
-        total_loss += loss.item()
 
-    avg_loss = total_loss / (V // batch_size + 1)
-    if step % 100 == 0:
-        print(f"Step {step}: Loss = {avg_loss:.6f}")
-        print(f"  μ 平均: {mu_all.mean().item():.6f}  最大: {mu_all.max().item():.6f}")
+    mu_all[v] = mu.detach()
 
+# 保存
 os.makedirs("visibility", exist_ok=True)
-torch.save(mu_all.detach().cpu(), "visibility/trained_mu_localSG.pt")
+torch.save(mu_all.cpu(), "visibility/trained_mu_localSG.pt")
 print("μ（ローカルSG）の学習完了。保存先: visibility/trained_mu_localSG.pt")
