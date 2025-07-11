@@ -44,8 +44,9 @@ def save_image(hits, theta_res, phi_res, save_path):
     plt.savefig(save_path)
     plt.close()
 
-def main(obj_path, output_dir, theta_res=100, phi_res=100):
+def main(obj_path, output_dir, npy_dir, theta_res=100, phi_res=100):
     os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(npy_dir, exist_ok=True)
     mesh = trimesh.load(obj_path, force='mesh')
     if mesh.vertex_normals is None or len(mesh.vertex_normals) == 0:
         mesh = mesh.copy()
@@ -59,13 +60,17 @@ def main(obj_path, output_dir, theta_res=100, phi_res=100):
 
     for i, (v, n) in enumerate(zip(mesh.vertices, mesh.vertex_normals)):
         hits = process_vertex_rays(v, n, mesh, directions)
-        np.save(os.path.join(output_dir, f"vertex_{i:04d}.npy"), hits)
+        np.save(os.path.join(npy_dir, f"vertex_{i:04d}.npy"), hits)
         save_image(hits, theta_res, phi_res, os.path.join(output_dir, f"vertex_{i:04d}.png"))
         print(f"Processed vertex {i+1}/{len(mesh.vertices)}")
+        
+        directions_path = os.path.join(npy_dir, "directions.npy")
+        if not os.path.exists(directions_path):
+            np.save(directions_path,  directions)
 
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) != 3:
-        print("Usage: python raytracing.py <input.obj> <output_dir>")
+    if len(sys.argv) != 4:
+        print("Usage: python raytracing.py <input.obj> <output_dir> <npy_dir>")
     else:
-        main(sys.argv[1], sys.argv[2])
+        main(sys.argv[1], sys.argv[2], sys.argv[3])
