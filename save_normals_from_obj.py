@@ -8,8 +8,12 @@ def save_vertex_normals(obj_path, output_dir):
     os.makedirs(output_dir, exist_ok=True)
     mesh = trimesh.load(obj_path, force='mesh')
 
-    if not mesh.has_vertex_normals or mesh.vertex_normals is None or len(mesh.vertex_normals) == 0:
-        mesh.compute_vertex_normals()
+    if mesh.vertex_normals is None or len(mesh.vertex_normals) == 0:
+        mesh.rezero()
+        mesh.remove_duplicate_faces()
+        mesh.remove_degenerate_faces()
+        mesh.fix_normals()
+        mesh.vertex_normals = mesh.vertex_normals  # 再計算
 
     normals = mesh.vertex_normals  # shape: [V, 3]
     save_path = os.path.join(output_dir, "normals.npy")
