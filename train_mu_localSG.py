@@ -23,8 +23,8 @@ def initialize_visSGs(J=5, theta_deg=45.0, mu_init=1.0):
     axes = []
     for theta, phi in theta_phi:
         x = np.sin(theta) * np.cos(phi)
-        y = np.cos(theta)
-        z = np.sin(theta) * np.sin(phi)
+        y = np.sin(theta) * np.sin(phi)
+        z = np.cos(theta)
         axes.append([x, y, z])
     axes = torch.tensor(axes, dtype=torch.float32)  # [J, 3]
     lambda_val = get_lambda_for_visibility(theta_deg)
