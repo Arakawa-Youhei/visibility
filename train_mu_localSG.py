@@ -4,15 +4,12 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-# =========================
-# SG初期化関数
-# =========================
 def get_lambda_for_visibility(theta_deg: float, target_value=1e-3):
     theta_rad = np.radians(theta_deg)
     cos_theta = np.cos(theta_rad)
     return np.log(1.0 / target_value) / (1 - cos_theta)
 
-def initialize_visSGs(J=5, theta_deg=45.0, mu_init=1.0):
+def initialize_visSGs(J=5, theta_deg=60.0, mu_init=1.0):
     theta_phi = [
         (0.0, 0.0),
         (np.pi/4, 0.0),
@@ -29,34 +26,9 @@ def initialize_visSGs(J=5, theta_deg=45.0, mu_init=1.0):
     axes = torch.tensor(axes, dtype=torch.float32)
     lambda_val = get_lambda_for_visibility(theta_deg)
     lambdas = torch.full((len(axes), 1), lambda_val, dtype=torch.float32)
-    if isinstance(mu_init, (int, float)):
-        mus = torch.full((len(axes), 3), mu_init, dtype=torch.float32)
-    else:
-        mus = torch.tensor(mu_init, dtype=torch.float32).expand(len(axes), 3)
+    mus = torch.full((len(axes), 3), mu_init, dtype=torch.float32)
     visSGs = torch.cat([axes, lambdas, mus], dim=1)
     return visSGs
-
-# =========================
-# メイン処理
-# =========================
-J = 5
-theta_deg = 45.0
-learning_rate = 1e-2
-num_steps = 1000
-batch_size = 64
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-npy_dir = "raytracing_results/202507111807/npy"
-npy_files = sorted([f for f in os.listdir(npy_dir) if f.endswith(".npy") and f.startswith("vertex_")])
-V_targets_np = [np.load(os.path.join(npy_dir, f)) for f in npy_files]
-V_targets = torch.from_numpy(np.stack(V_targets_np)).float()
-
-dirs = torch.from_numpy(np.load(os.path.join(npy_dir, "directions.npy"))).float().to(device)
-normals = torch.from_numpy(np.load(os.path.join(npy_dir, "normals.npy"))).float().to(device)
-
-V, D = V_targets.shape
-dirs = dirs.unsqueeze(0).expand(V, -1, -1)
-normals = normals / normals.norm(dim=1, keepdim=True)
 
 def world_to_local(dirs, normals):
     up = torch.tensor([0.0, 1.0, 0.0], device=dirs.device).expand_as(normals)
@@ -65,18 +37,8 @@ def world_to_local(dirs, normals):
     z = normals
     x = torch.nn.functional.normalize(torch.cross(up, z), dim=1)
     y = torch.cross(z, x)
-    R = torch.stack([x, y, z], dim=2)
-    dirs_local = torch.bmm(dirs, R)
-    return dirs_local
-
-dirs_local = world_to_local(dirs, normals).cpu()
-
-base_visSGs = initialize_visSGs(J=J, theta_deg=theta_deg)
-axes_local = base_visSGs[:, :3].to(device)
-lambdas = base_visSGs[:, 3:4].to(device)
-
-mu_all = torch.nn.Parameter(torch.ones(V, J, 3, device=device))
-optimizer = torch.optim.Adam([mu_all], lr=learning_rate)
+    R = torch.stack([x, y, z], dim=2)  # [B, 3, 3]
+    return torch.bmm(dirs, R)          # [B, D, 3]
 
 def visibility_loss(V_target, mus, dirs_local, axes, lambdas):
     V, D, _ = dirs_local.shape
@@ -90,21 +52,43 @@ def visibility_loss(V_target, mus, dirs_local, axes, lambdas):
     loss = torch.nn.functional.mse_loss(G_sum, V_target)
     return loss
 
+# ========== メイン処理 ==========
+J = 5
+theta_deg = 60.0
+learning_rate = 5e-3
+num_steps = 2000
+batch_size = 64
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+npy_dir = "raytracing_results/202507111807/npy"
+npy_files = sorted([f for f in os.listdir(npy_dir) if f.endswith(".npy") and f.startswith("vertex_")])
+V_targets_np = [np.load(os.path.join(npy_dir, f)) for f in npy_files]
+V_targets = torch.from_numpy(np.stack(V_targets_np)).float()
+dirs_all = torch.from_numpy(np.load(os.path.join(npy_dir, "directions.npy"))).float()
+normals_all = torch.from_numpy(np.load(os.path.join(npy_dir, "normals.npy"))).float()
+
+V, D = V_targets.shape
+dirs_all = dirs_all.unsqueeze(0).expand(V, -1, -1)
+
+base_visSGs = initialize_visSGs(J=J, theta_deg=theta_deg)
+axes_local = base_visSGs[:, :3].to(device)
+lambdas = base_visSGs[:, 3:4].to(device)
+
+mu_all = torch.nn.Parameter(torch.ones(V, J, 3, device=device))
+optimizer = torch.optim.Adam([mu_all], lr=learning_rate)
+
 for step in tqdm(range(num_steps)):
     total_loss = 0.0
     for i in range(0, V, batch_size):
         V_batch = slice(i, min(i + batch_size, V))
+        dirs_batch = dirs_all[V_batch].to(device)
+        normals_batch = normals_all[V_batch].to(device)
+        dirs_local_batch = world_to_local(dirs_batch, normals_batch)
+
         V_targets_batch = V_targets[V_batch].to(device)
         mu_batch = mu_all[V_batch]
-        dirs_batch = dirs_local[V_batch].to(device)
 
-        loss = visibility_loss(
-            V_targets_batch,
-            mu_batch,
-            dirs_batch,
-            axes_local,
-            lambdas
-        )
+        loss = visibility_loss(V_targets_batch, mu_batch, dirs_local_batch, axes_local, lambdas)
 
         optimizer.zero_grad()
         loss.backward()
