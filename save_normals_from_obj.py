@@ -18,6 +18,6 @@ def save_vertex_normals(obj_path, output_dir):
 
 # 使用例
 if __name__ == "__main__":
-    obj_path = "models/sample.obj"  # <- 読み込む .obj ファイルのパス
-    output_dir = "visibility/npy_data"  # <- normals.npy を保存するディレクトリ
+    obj_path = "exp/strawberry_s2/mesh/mesh.obj"  # <- 読み込む .obj ファイルのパス
+    output_dir = "raytracing_results/202507111807/npy"  # <- normals.npy を保存するディレクトリ
     save_vertex_normals(obj_path, output_dir)
