@@ -54,7 +54,7 @@ def visibility_loss(V_target, mus, dirs_local, axes, lambdas):
 # ========== メイン処理 ==========
 
 J = 5
-theta_deg = 60.0
+theta_deg = 45.0
 learning_rate = 5e-3
 num_steps = 2000
 device = "cuda" if torch.cuda.is_available() else "cpu"
