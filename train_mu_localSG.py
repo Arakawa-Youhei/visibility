@@ -6,8 +6,7 @@ from tqdm import tqdm
 
 def get_lambda_for_visibility(theta_deg: float, target_value=1e-3):
     theta_rad = np.radians(theta_deg)
-    cos_theta = np.cos(theta_rad)
-    return np.log(1.0 / target_value) / (1 - cos_theta)
+    return np.log(1 / target_value) / (1 - np.cos(theta_rad))
 
 def initialize_visSGs(J=5, theta_deg=60.0, mu_init=1.0):
     theta_phi = [
@@ -24,11 +23,9 @@ def initialize_visSGs(J=5, theta_deg=60.0, mu_init=1.0):
         z = np.cos(theta)
         axes.append([x, y, z])
     axes = torch.tensor(axes, dtype=torch.float32)
-    lambda_val = get_lambda_for_visibility(theta_deg)
-    lambdas = torch.full((len(axes), 1), lambda_val, dtype=torch.float32)
-    mus = torch.full((len(axes), 3), mu_init, dtype=torch.float32)
-    visSGs = torch.cat([axes, lambdas, mus], dim=1)
-    return visSGs
+    lambdas = torch.full((J, 1), get_lambda_for_visibility(theta_deg), dtype=torch.float32)
+    mus = torch.full((J, 3), mu_init, dtype=torch.float32)
+    return torch.cat([axes, lambdas, mus], dim=1)
 
 def world_to_local(dirs, normals):
     up = torch.tensor([0.0, 1.0, 0.0], device=dirs.device).expand_as(normals)
@@ -37,8 +34,8 @@ def world_to_local(dirs, normals):
     z = normals
     x = torch.nn.functional.normalize(torch.cross(up, z), dim=1)
     y = torch.cross(z, x)
-    R = torch.stack([x, y, z], dim=2)  # [B, 3, 3]
-    return torch.bmm(dirs, R)          # [B, D, 3]
+    R = torch.stack([x, y, z], dim=2)
+    return torch.bmm(dirs, R)
 
 def visibility_loss(V_target, mus, dirs_local, axes, lambdas):
     V, D, _ = dirs_local.shape
@@ -49,38 +46,40 @@ def visibility_loss(V_target, mus, dirs_local, axes, lambdas):
     dot = torch.sum(dirs_exp * axes_exp, dim=-1, keepdim=True)
     G = mus_exp * torch.exp(lambdas_exp * (dot - 1.))
     G_sum = G.sum(dim=2).mean(dim=-1)
-    loss = torch.nn.functional.mse_loss(G_sum, V_target)
-    return loss
+    return torch.nn.functional.mse_loss(G_sum, V_target)
 
-# ========== メイン処理 ==========
+# メイン設定
 J = 5
 theta_deg = 60.0
-learning_rate = 5e-3
+learning_rate = 1e-3
 num_steps = 2000
 batch_size = 64
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
+# データ読み込み
 npy_dir = "raytracing_results/202507111807/npy"
 npy_files = sorted([f for f in os.listdir(npy_dir) if f.endswith(".npy") and f.startswith("vertex_")])
 V_targets_np = [np.load(os.path.join(npy_dir, f)) for f in npy_files]
 V_targets = torch.from_numpy(np.stack(V_targets_np)).float()
+
 dirs_all = torch.from_numpy(np.load(os.path.join(npy_dir, "directions.npy"))).float()
 normals_all = torch.from_numpy(np.load(os.path.join(npy_dir, "normals.npy"))).float()
-
-V, D = V_targets.shape
-dirs_all = dirs_all.unsqueeze(0).expand(V, -1, -1)
+dirs_all = dirs_all.unsqueeze(0).expand(len(V_targets), -1, -1)
 
 base_visSGs = initialize_visSGs(J=J, theta_deg=theta_deg)
 axes_local = base_visSGs[:, :3].to(device)
 lambdas = base_visSGs[:, 3:4].to(device)
 
-mu_all = torch.nn.Parameter(torch.ones(V, J, 3, device=device))
-optimizer = torch.optim.Adam([mu_all], lr=learning_rate)
+mu_all = torch.nn.Parameter(torch.ones(len(V_targets), J, 3, device=device))
 
+# ★ 正則化（weight decay）のみ追加
+optimizer = torch.optim.Adam([mu_all], lr=learning_rate, weight_decay=1e-4)
+
+# 学習ループ
 for step in tqdm(range(num_steps)):
     total_loss = 0.0
-    for i in range(0, V, batch_size):
-        V_batch = slice(i, min(i + batch_size, V))
+    for i in range(0, len(V_targets), batch_size):
+        V_batch = slice(i, min(i + batch_size, len(V_targets)))
         dirs_batch = dirs_all[V_batch].to(device)
         normals_batch = normals_all[V_batch].to(device)
         dirs_local_batch = world_to_local(dirs_batch, normals_batch)
@@ -93,9 +92,10 @@ for step in tqdm(range(num_steps)):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+
         total_loss += loss.item()
 
-    avg_loss = total_loss / (V // batch_size + 1)
+    avg_loss = total_loss / (len(V_targets) // batch_size + 1)
     if step % 100 == 0:
         print(f"Step {step}: Loss = {avg_loss:.6f}")
         print(f"  μ 平均: {mu_all.mean().item():.6f}  最大: {mu_all.max().item():.6f}")
