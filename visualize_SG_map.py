@@ -26,7 +26,7 @@ def initialize_visSGs(J=5, theta_deg=45.0):
     return torch.tensor(axes, dtype=torch.float32), torch.tensor(lambdas, dtype=torch.float32)
 
 # ====== 可視化関数 ======
-def visualize_visibility(vertex_id=0, mu_path="visibility/trained_mu_localSG.pt", theta_deg=45.0, res=100):
+def visualize_visibility(vertex_id=0, mu_path="visibility/trained_mu_localSG.pt", theta_deg=45.0, res=100, output_dir="visibility/visibility_maps"):
     mu_all = torch.load(mu_path)  # [V, J, 3]
     mu = mu_all[vertex_id]        # [J, 3]
 
