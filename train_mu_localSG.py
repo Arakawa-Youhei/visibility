@@ -97,7 +97,9 @@ for i in tqdm(range(0, V, batch_size)):
         loss = visibility_loss(V_target_batch, mu, dirs_local, axes_local, lambdas)
         loss.backward()
         optimizer.step()
-
+        
+        if step % 100 == 0 or step == num_steps - 1:
+        print(f"バッチ {i} ～ {v_batch.stop - 1}, Step {step}: Loss = {loss.item():.6f}")
     mu_all[v_batch] = mu.detach()
 
 # 保存
