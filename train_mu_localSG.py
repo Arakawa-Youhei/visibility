@@ -89,7 +89,7 @@ for i in tqdm(range(0, V, batch_size)):
     dirs_local = world_to_local(dirs_batch, normals_batch)  # [B, D, 3]
     V_target_batch = V_targets[v_batch].to(device)     # [B, D]
 
-    mu = torch.nn.Parameter(torch.ones(batch_V, J, 3, device=device))  # [B, J, 3]
+    mu = torch.nn.Parameter(torch.ones(batch_V, J, 3, device=device)*0.2 + 0.9)  # [B, J, 3]
     optimizer = torch.optim.Adam([mu], lr=learning_rate)
 
     for step in range(num_steps):
