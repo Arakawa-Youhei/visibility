@@ -12,7 +12,7 @@ pattern = "*.png"
 output_file = "result_lpips.txt"
 # ===============
 
-def load_image(path, size=None):
+def load_image(path, size=(256, 256)):
     img = Image.open(path).convert('RGB')
     if size is not None:
         img = img.resize(size, Image.BICUBIC)
