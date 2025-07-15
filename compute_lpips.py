@@ -1,34 +1,48 @@
-import torch
+import os
+import glob
 import lpips
-from PIL import Image
+import torch
 import torchvision.transforms as transforms
-import argparse
+from PIL import Image
 
-# 引数の定義
-parser = argparse.ArgumentParser()
-parser.add_argument('--img1', type=str, required=True, help='画像1のパス（GTなど）')
-parser.add_argument('--img2', type=str, required=True, help='画像2のパス（再構成画像など）')
-args = parser.parse_args()
+# === 入力設定 ===
+gt_dir = "/home/arakawa/HyperDreamer/exp_vis/strawberry_s2/results/gt"
+pred_dir = "/home/arakawa/HyperDreamer/exp_vis/strawberry_s2/results/output"
+pattern = "*.png"
+output_file = "result_lpips.txt"
+# ===============
 
-# LPIPSモデルのロード（デフォルトはAlexNet）
-loss_fn = lpips.LPIPS(net='alex')  # 例: 'alex', 'vgg'
+def load_image(path, size=None):
+    img = Image.open(path).convert('RGB')
+    if size is not None:
+        img = img.resize(size, Image.BICUBIC)
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,), (0.5,))
+    ])
+    return transform(img).unsqueeze(0)
 
-# 画像の読み込みと前処理
-transform = transforms.Compose([
-    transforms.Resize((256, 256)),     # 入力画像のサイズを統一
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)  # [-1, 1] にスケーリング
-])
+def compute_lpips(gt_dir, pred_dir, pattern='*.png', output_file='result_lpips.txt'):
+    loss_fn = lpips.LPIPS(net='alex').cuda()
+    gt_files = sorted(glob.glob(os.path.join(gt_dir, pattern)))
+    pred_files = sorted(glob.glob(os.path.join(pred_dir, pattern)))
 
-def load_image(path):
-    image = Image.open(path).convert('RGB')
-    return transform(image).unsqueeze(0)  # [1, 3, H, W]
+    scores = []
 
-img0 = load_image(args.img1)
-img1 = load_image(args.img2)
+    with open(output_file, 'w') as f:
+        for gt, pred in zip(gt_files, pred_files):
+            img1 = load_image(gt).cuda()
+            img2 = load_image(pred).cuda()
+            d = loss_fn(img1, img2).item()
+            line = f"[LPIPS] {os.path.basename(gt)} vs {os.path.basename(pred)}: {d:.4f}"
+            print(line)
+            f.write(line + '\n')
+            scores.append(d)
 
-# LPIPS値の計算
-with torch.no_grad():
-    dist = loss_fn(img0, img1)
+        mean_score = sum(scores) / len(scores)
+        summary = f"\n[LPIPS] Mean LPIPS: {mean_score:.4f}"
+        print(summary)
+        f.write(summary + '\n')
 
-print(f"LPIPS Distance: {dist.item():.4f}")
+if __name__ == "__main__":
+    compute_lpips(gt_dir, pred_dir, pattern, output_file)
