@@ -6,8 +6,8 @@ import torchvision.transforms as transforms
 from PIL import Image
 
 # === 入力設定 ===
-gt_dir = "/home/arakawa/HyperDreamer/exp_vis/strawberry_s2/results/gt"
-pred_dir = "/home/arakawa/HyperDreamer/exp_vis/strawberry_s2/results/output"
+gt_dir = "/home/arakawa/HyperDreamer/exp/frog3c_s2/results/gt"
+pred_dir = "/home/arakawa/HyperDreamer/exp/frog3c_s2/results/output"
 pattern = "*.png"
 output_file = "result_lpips.txt"
 # ===============
