@@ -4,6 +4,78 @@ import numpy as np
 
 TINY_NUMBER = 1e-6
 
+def compute_envmap(lgtSGs, H, W, upper_hemi=False):
+    # exactly same convetion as Mitsuba, check envmap_convention.png
+    if upper_hemi:
+        phi, theta = torch.meshgrid([torch.linspace(0., np.pi / 2., H),
+                                     torch.linspace(-0.5 * np.pi, 1.5 * np.pi,
+                                                    W)])
+    else:
+        phi, theta = torch.meshgrid([torch.linspace(0., np.pi, H),
+                                     torch.linspace(-0.5 * np.pi, 1.5 * np.pi,
+                                                    W)])
+
+    viewdirs = torch.stack([torch.cos(theta) * torch.sin(phi), torch.cos(phi),
+                            torch.sin(theta) * torch.sin(phi)],
+                           dim=-1)  # [H, W, 3]
+
+    lgtSGs = lgtSGs.clone().detach()
+    viewdirs = viewdirs.to(lgtSGs.device)
+    viewdirs = viewdirs.unsqueeze(-2)  # [..., 1, 3]
+    # [M, 7] ---> [..., M, 7]
+    dots_sh = list(viewdirs.shape[:-2])
+    M = lgtSGs.shape[0]
+    lgtSGs = lgtSGs.view([1, ] * len(dots_sh) + [M, 7]).expand(dots_sh + [M, 7])
+    # sanity
+    # [..., M, 3]
+    lgtSGLobes = lgtSGs[..., :3] / (
+        torch.norm(lgtSGs[..., :3], dim=-1, keepdim=True))
+    lgtSGLambdas = torch.abs(lgtSGs[..., 3:4])
+    lgtSGMus = torch.abs(lgtSGs[..., -3:])  # positive values
+    # [..., M, 3]
+    rgb = lgtSGMus * torch.exp(lgtSGLambdas * (
+                torch.sum(viewdirs * lgtSGLobes, dim=-1, keepdim=True) - 1.))
+    rgb = torch.sum(rgb, dim=-2)  # [..., 3]
+    envmap = rgb.reshape((H, W, 3))
+    return envmap
+
+
+def compute_envmap_pcd(lgtSGs, N=1000, upper_hemi=False):
+    viewdirs = torch.randn((N, 3))
+    viewdirs = viewdirs / (
+                torch.norm(viewdirs, dim=-1, keepdim=True) + TINY_NUMBER)
+
+    if upper_hemi:
+        # y > 0
+        viewdirs = torch.cat(
+            (viewdirs[:, 0:1], torch.abs(viewdirs[:, 1:2]), viewdirs[:, 2:3]),
+            dim=-1)
+
+    lgtSGs = lgtSGs.clone().detach()
+    viewdirs = viewdirs.to(lgtSGs.device)
+    viewdirs = viewdirs.unsqueeze(-2)  # [..., 1, 3]
+
+    # [M, 7] ---> [..., M, 7]
+    dots_sh = list(viewdirs.shape[:-2])
+    M = lgtSGs.shape[0]
+    lgtSGs = lgtSGs.view([1, ] * len(dots_sh) + [M, 7]).expand(dots_sh + [M, 7])
+
+    # sanity
+    # [..., M, 3]
+    lgtSGLobes = lgtSGs[..., :3] / (
+                torch.norm(lgtSGs[..., :3], dim=-1, keepdim=True) + TINY_NUMBER)
+    lgtSGLambdas = torch.abs(lgtSGs[..., 3:4])
+    lgtSGMus = torch.abs(lgtSGs[..., -3:])  # positive values
+
+    # [..., M, 3]
+    rgb = lgtSGMus * torch.exp(lgtSGLambdas * (
+                torch.sum(viewdirs * lgtSGLobes, dim=-1, keepdim=True) - 1.))
+    rgb = torch.sum(rgb, dim=-2)  # [..., 3]
+
+    return viewdirs.squeeze(-2), rgb
+
+
+
 def prepend_dims(tensor, shape):
     orig_shape = list(tensor.shape)
     return tensor.view([1] * len(shape) + orig_shape).expand(shape + [-1] * len(orig_shape))
