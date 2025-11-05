@@ -112,7 +112,7 @@ def render_with_preloaded_sg(lgtSGs, specular_reflectance, roughness, diffuse_al
     """
     visSGs_all.pt を自動読み込みして、render_with_sg に渡すラッパー関数
     """
-    visSGs_all = torch.load("frog3c_visibility/visSGs_all.pt")  # [V, J, 7]
+    visSGs_all = torch.load("frog3c_visibility_lsm/visSGs_all.pt")  # [V, J, 7]
     return render_with_sg(
         lgtSGs, specular_reflectance, roughness, diffuse_albedo,
         normal, viewdirs, visSGs=visSGs_all, diffuse_rgb=diffuse_rgb
